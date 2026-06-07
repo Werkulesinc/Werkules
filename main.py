@@ -1,6 +1,7 @@
 import asyncio
 import re
 import threading
+import time
 import json
 import sys
 import traceback
@@ -576,6 +577,10 @@ class JarvisLive:
         self._speaking_lock = threading.Lock()
         self.ui.on_text_command = self._on_text_command
         self._turn_done_event: asyncio.Event | None = None
+        self._last_recv_time: float = 0.0
+        self._force_reconnect = threading.Event()
+        self._connected_once  = False
+        self._start_sleep_watcher()
 
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
@@ -595,6 +600,25 @@ class JarvisLive:
             self.ui.set_state("SPEAKING")
         elif not self.ui.muted:
             self.ui.set_state("LISTENING")
+
+    def _start_sleep_watcher(self):
+        def _watch():
+            while True:
+                t0 = time.monotonic()
+                time.sleep(5)
+                if time.monotonic() - t0 > 12:
+                    print("[JARVIS] 💤 Sleep/wake detected — queuing reconnect")
+                    self._force_reconnect.set()
+        threading.Thread(target=_watch, daemon=True).start()
+
+    async def _watchdog(self):
+        while True:
+            await asyncio.sleep(30)
+            if self._force_reconnect.is_set():
+                self._force_reconnect.clear()
+                raise ConnectionError("Sleep/wake detected — reconnecting")
+            if self._last_recv_time > 0 and (time.monotonic() - self._last_recv_time) > 90:
+                raise ConnectionError("No Gemini activity for 90s — reconnecting")
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -850,6 +874,7 @@ class JarvisLive:
         try:
             while True:
                 async for response in self.session.receive():
+                    self._last_recv_time = time.monotonic()
 
                     if response.data:
                         if self._turn_done_event and self._turn_done_event.is_set():
@@ -957,6 +982,8 @@ class JarvisLive:
                     self._turn_done_event = asyncio.Event()
 
                     print("[JARVIS] ✅ Connected.")
+                    self._connected_once  = True
+                    self._last_recv_time  = time.monotonic()
                     self.ui.set_state("LISTENING")
                     self.ui.write_log("SYS: Werkules online - Jarvis ready.")
 
@@ -964,12 +991,15 @@ class JarvisLive:
                     tg.create_task(self._listen_audio())
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
+                    tg.create_task(self._watchdog())
 
             except Exception as e:
                 print(f"[JARVIS] ⚠️ {e}")
                 traceback.print_exc()
             self.set_speaking(False)
             self.ui.set_state("THINKING")
+            if self._connected_once:
+                self.ui.write_log("SYS: Reconnecting...")
             print("[JARVIS] 🔄 Reconnecting in 3s...")
             await asyncio.sleep(3)
 
