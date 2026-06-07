@@ -1,0 +1,18 @@
+{
+  "scan_time": "2026-06-06T18:18:29.193398",
+  "computer": {
+    "hostname": "Office",
+    "os": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "cpu_count": 8,
+    "memory_gb": 15.8
+  },
+  "drives": [
+    {
+      "device": "C:\\",
+      "mount": "C:\\",
+      "total_gb": 952.55,
+      "free_gb": 733.06
+    }
+  ]
+}
