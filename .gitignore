@@ -2,5 +2,5 @@
 __pycache__/
 config/api_keys.json
 *.log
-
-config/api_keys.json
+memory/environment_state.json
+memory/long_term.json

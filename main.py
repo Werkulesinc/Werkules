@@ -953,7 +953,7 @@ class JarvisLive:
 
                     print("[JARVIS] ✅ Connected.")
                     self.ui.set_state("LISTENING")
-                    self.ui.write_log("SYS: JARVIS online.")
+                    self.ui.write_log("SYS: Werkules online - Jarvis ready.")
 
                     tg.create_task(self._send_realtime())
                     tg.create_task(self._listen_audio())
