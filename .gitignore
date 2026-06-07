@@ -2,3 +2,5 @@
 __pycache__/
 config/api_keys.json
 *.log
+
+config/api_keys.json
