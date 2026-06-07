@@ -19,7 +19,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QBrush, QColor, QDragEnterEvent, QDropEvent, QFont, QFontDatabase,
-    QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+    QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
     QRadialGradient, QShortcut,
 )
 from PyQt6.QtWidgets import (
@@ -991,6 +991,7 @@ class MainWindow(QMainWindow):
     def __init__(self, face_path: str):
         super().__init__()
         self.setWindowTitle("Werkules")
+        self.setWindowIcon(QIcon("werkules.ico"))
         self.setMinimumSize(_MIN_W, _MIN_H)
         self.resize(_DEFAULT_W, _DEFAULT_H)
 
