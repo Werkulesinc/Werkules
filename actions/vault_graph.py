@@ -1,7 +1,7 @@
 ﻿from pathlib import Path
 import json
 
-VAULT = Path(r"C:\Jarvis_local_Comp\Jarvis_Brain\Vault")
+VAULT = Path(r"C:\Werkules\vault")
 
 INDEX_FILE = VAULT / "System" / "vault_index.json"
 OUTPUT_FILE = VAULT / "System" / "vault_graph.json"

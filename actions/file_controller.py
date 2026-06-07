@@ -14,15 +14,7 @@ _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
 _SAFE_ROOTS: list[Path] = [
     Path.home(),
-
-    # Jarvis source code
-    Path(r"C:\Jarvis_local_Comp"),
-
-    # Obsidian / memory vault
-    Path(r"C:\Jarvis_Brain"),
-
-    # Optional project workspace
-    Path(r"C:\Jarvis_Workspace"),
+    Path(r"C:\Werkules"),
 ]
 
 def _is_safe_path(target: Path) -> bool:

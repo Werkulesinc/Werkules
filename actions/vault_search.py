@@ -1,7 +1,7 @@
 ﻿from pathlib import Path
 import re
 
-VAULT_PATH = Path(r"C:\Jarvis_local_Comp\Jarvis_Brain\Vault")
+VAULT_PATH = Path(r"C:\Werkules\vault")
 MAX_RESULTS = 8
 MAX_SNIPPET_CHARS = 600
 

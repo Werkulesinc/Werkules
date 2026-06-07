@@ -19,14 +19,26 @@ chatbot — it is a continuous audio session with bidirectional audio and functi
 
 ---
 
+## Folder Structure
+
+```
+C:\Werkules\
+  app\                 # all application code (this repo)
+  vault\               # Obsidian vault and brain files (move from Jarvis_Brain\Vault)
+  logs\                # log files
+  backups\             # backups (empty)
+```
+
 ## Repository Layout
 
 ```
-Mark-XXXIX-main/
+C:\Werkules\app\
   main.py              # entry point — audio pipeline + tool dispatch
   ui.py                # entire PyQt6 interface (~1,500 lines)
   setup.py             # one-shot install (pip + playwright)
   requirements.txt     # all Python dependencies
+  werkules_launcher.bat  # launch with pythonw (no console window)
+  werkules.ico         # app icon
   face.png             # avatar shown in HUD (optional — fallback orb if missing)
 
   core/
@@ -310,13 +322,16 @@ The Obsidian vault is Jarvis's external long-term knowledge base. All vault acce
 **This path is hardcoded in 6 files:**
 
 ```python
-VAULT_PATH = Path(r"C:\Jarvis_local_Comp\Jarvis_Brain\Vault")
+VAULT_PATH = Path(r"C:\Werkules\vault")
 ```
 
 Files that contain it: `vault_search.py`, `vault_read.py`, `vault_graph.py`,
 `vault_graph_query.py`, `vault_graph_tool.py`, `vault_index.py`.
 
 If the vault moves, update all six. Consider extracting to config if refactoring.
+
+**Note:** The physical vault content still needs to be moved from
+`C:\Jarvis_local_Comp\Jarvis_Brain\Vault` → `C:\Werkules\vault` if not already done.
 
 ### What Each Vault File Does
 
@@ -459,11 +474,7 @@ to the prompt file.
 
 3. **`config_manager.py` and `config/__init__.py` overlap.** Both read `api_keys.json`. Both exist. Don't add a third.
 
-4. **Vault path hardcoded in 6 files.** Should be read from config. Not a bug unless the vault moves.
-
-5. **`actions/environment_scanner.backup.py`** — a leftover backup file not caught by the cleanup pattern (it ends in `.backup.py`, not `.backup`). Safe to delete.
-
-6. **`agent/planner.py` says `MARK XXV`** in its system prompt string. This is a stale reference from an older version. Functionally harmless but cosmetically wrong.
+4. **Vault path hardcoded in 6 files.** Should be read from config. Not a bug unless the vault moves. Currently points to `C:\Werkules\vault`.
 
 ---
 
@@ -484,8 +495,10 @@ to the prompt file.
 ## Environment
 
 - **OS:** Windows 11 (primary). Cross-platform code exists but Windows is the test target.
-- **Python:** 3.11 or 3.12
-- **Virtual env:** `.venv/` in project root (gitignored)
+- **Python:** 3.14 (venv at `C:\Werkules\app\.venv\`)
+- **Project root:** `C:\Werkules\app\`
+- **Vault:** `C:\Werkules\vault\`
+- **Launcher:** `C:\Werkules\app\werkules_launcher.bat` (double-click to start, no console)
 - **Config:** `config/api_keys.json` (gitignored)
 - **Memory:** `memory/long_term.json` (gitignored)
 - **Environment state:** `memory/environment_state.json` (gitignored)

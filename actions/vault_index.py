@@ -2,7 +2,7 @@
 import re
 import json
 
-VAULT = Path(r"C:\Jarvis_local_Comp\Jarvis_Brain\Vault")
+VAULT = Path(r"C:\Werkules\vault")
 
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 TAG_RE = re.compile(r"(?<!\w)#([A-Za-z0-9_\-]+)")

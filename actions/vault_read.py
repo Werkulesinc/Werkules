@@ -1,6 +1,6 @@
 ﻿from pathlib import Path
 
-VAULT_PATH = Path(r"C:\Jarvis_local_Comp\Jarvis_Brain\Vault")
+VAULT_PATH = Path(r"C:\Werkules\vault")
 MAX_READ_CHARS = 12000
 
 def _resolve_vault_path(note_path: str) -> Path | None:
