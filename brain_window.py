@@ -77,6 +77,9 @@ class AppAPI(BrainAPI):
         self._win.destroy()
         threading.Timer(0.4, lambda: os._exit(0)).start()
 
+    def resize_to(self, w: int, h: int):
+        self._win.resize(max(700, int(w)), max(500, int(h)))
+
     def toggle_mic(self):
         headless_ui.muted = not headless_ui.muted
         return not headless_ui.muted  # True = mic now active

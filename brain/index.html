@@ -152,6 +152,16 @@
   }
   #mic-label.live{color:var(--green);}
 
+  /* ── RESIZE GRIP ── */
+  #resize-grip{
+    position:fixed;bottom:0;right:0;width:16px;height:16px;z-index:50;cursor:nwse-resize;
+    background:repeating-linear-gradient(
+      135deg,
+      transparent,transparent 3px,
+      rgba(62,224,138,.35) 3px,rgba(62,224,138,.35) 4px
+    );
+  }
+
   /* ── LEGEND ── */
   #legend{
     position:absolute;bottom:18px;left:12px;z-index:8;font-size:10px;color:var(--dim);
@@ -301,6 +311,7 @@
     <div id="right-tab" class="edge-tab" title="Open Jarvis chat">«</div>
   </div>
 </div>
+<div id="resize-grip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -978,6 +989,28 @@ function initWS(){
   ws.onerror=()=>{};
 }
 initWS();
+
+/* ═══════════════════════════════════════════════════════════
+   RESIZE GRIP
+═══════════════════════════════════════════════════════════ */
+(()=>{
+  const grip=document.getElementById('resize-grip');
+  let dragging=false,sx=0,sy=0,sw=0,sh=0,last=0;
+  grip.addEventListener('pointerdown',e=>{
+    e.stopPropagation();
+    dragging=true; sx=e.clientX; sy=e.clientY;
+    sw=window.innerWidth; sh=window.innerHeight;
+    grip.setPointerCapture(e.pointerId);
+  });
+  grip.addEventListener('pointermove',e=>{
+    if(!dragging) return;
+    const now=Date.now(); if(now-last<32) return; last=now;
+    const w=Math.max(700,Math.round(sw+(e.clientX-sx)));
+    const h=Math.max(500,Math.round(sh+(e.clientY-sy)));
+    if(window.pywebview) window.pywebview.api.resize_to(w,h);
+  });
+  grip.addEventListener('pointerup',()=>{dragging=false;});
+})();
 </script>
 </body>
 </html>
