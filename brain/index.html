@@ -907,6 +907,7 @@ micBtn.addEventListener('click',()=>{
   micLabel.textContent=micLive?'listening…':'click to talk';
   if(micLive) setMind('thinking',999999);
   else        setMind('idle',0);
+  if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'mic_toggle'}));
 });
 
 /* ═══════════════════════════════════════════════════════════

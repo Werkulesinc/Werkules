@@ -661,6 +661,8 @@ class JarvisLive:
                         text = msg.get("text", "").strip()
                         if text:
                             self._on_text_command(text)
+                    elif msg.get("type") == "mic_toggle":
+                        self.ui.muted = not self.ui.muted
             except Exception:
                 pass
             finally:

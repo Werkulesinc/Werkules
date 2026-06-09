@@ -1,8 +1,63 @@
 import os
+import json
+import asyncio
 import threading
 import webview
 from pathlib import Path
 from brain.brain_data import BrainAPI, BrainWatcher, get_graph_data
+
+
+class HeadlessUI:
+    """Minimal JarvisUI-compatible interface for headless (no PyQt) operation."""
+
+    def __init__(self):
+        self._muted = True  # mic starts muted; brain mic button controls this
+        self._on_text_command = None
+
+    @property
+    def muted(self) -> bool:
+        return self._muted
+
+    @muted.setter
+    def muted(self, v: bool):
+        self._muted = bool(v)
+
+    @property
+    def current_file(self):
+        return None
+
+    @property
+    def on_text_command(self):
+        return self._on_text_command
+
+    @on_text_command.setter
+    def on_text_command(self, cb):
+        self._on_text_command = cb
+
+    def set_state(self, state: str):
+        pass
+
+    def write_log(self, text: str):
+        pass
+
+    def start_speaking(self):
+        pass
+
+    def stop_speaking(self):
+        pass
+
+    def wait_for_api_key(self):
+        config = Path(__file__).parent / "config" / "api_keys.json"
+        if not config.exists():
+            raise RuntimeError(
+                "config/api_keys.json missing — run main.py once to configure the API key"
+            )
+        data = json.loads(config.read_text())
+        if not data.get("gemini_api_key"):
+            raise RuntimeError("gemini_api_key missing in config/api_keys.json")
+
+
+headless_ui = HeadlessUI()
 
 
 class AppAPI(BrainAPI):
@@ -21,6 +76,24 @@ class AppAPI(BrainAPI):
     def close_window(self):
         self._win.destroy()
         threading.Timer(0.4, lambda: os._exit(0)).start()
+
+    def toggle_mic(self):
+        headless_ui.muted = not headless_ui.muted
+        return not headless_ui.muted  # True = mic now active
+
+
+def _start_engine():
+    from main import JarvisLive
+    try:
+        headless_ui.wait_for_api_key()
+    except RuntimeError as e:
+        print(f"[BRAIN-ENGINE] ❌ {e}")
+        return
+    jarvis = JarvisLive(headless_ui)
+    try:
+        asyncio.run(jarvis.run())
+    except KeyboardInterrupt:
+        pass
 
 
 HTML = (Path(__file__).parent / "brain" / "index.html").as_uri()
@@ -47,4 +120,6 @@ def on_started():
     watcher.start()
     print("[brain] Watcher: live — watching C:\\Werkules for changes")
 
+
+threading.Thread(target=_start_engine, daemon=True).start()
 webview.start(on_started)
