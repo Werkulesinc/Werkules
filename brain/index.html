@@ -88,6 +88,8 @@
   .lock-ico{font-size:9px;color:var(--amber);flex-shrink:0;}
   .row.pulse{animation:rowpulse 1.6s ease;}
   .row.active{background:rgba(62,224,138,.11);}
+  .row[data-node-id]{cursor:pointer;}
+  .row[data-node-id]:hover{background:rgba(62,224,138,.10);}
   @keyframes rowpulse{
     0%{background:rgba(84,224,138,.45);box-shadow:0 0 10px rgba(84,224,138,.4);}
     100%{background:transparent;box-shadow:none;}
@@ -419,6 +421,12 @@ function highlightTreeRow(id){
   r.scrollIntoView({block:'center',behavior:'smooth'});
 }
 
+treeEl.addEventListener('click',e=>{
+  const row=e.target.closest('[data-node-id]'); if(!row) return;
+  const n=nodeByDataId[row.dataset.nodeId]; if(!n) return;
+  selectNode(n);
+});
+
 /* ═══════════════════════════════════════════════════════════
    GALAXY ENGINE — Three.js
 ═══════════════════════════════════════════════════════════ */
@@ -620,9 +628,21 @@ function neighborsOf(n){
    CAMERA
 ═══════════════════════════════════════════════════════════ */
 let cT=0.7,cP=1.15,cR=440,auto=true;
+let cTTgt=0.7,cPTgt=1.15,cRTgt=440,focusPending=false;
 function applyCam(){camera.position.set(cR*Math.sin(cP)*Math.cos(cT),cR*Math.cos(cP),cR*Math.sin(cP)*Math.sin(cT));camera.lookAt(0,0,0);}
+
+function focusNode(n){
+  const wp=new THREE.Vector3();
+  n.obj.getWorldPosition(wp);
+  const d=wp.length(); if(d<1) return;
+  cTTgt=Math.atan2(wp.z,wp.x);
+  cPTgt=Math.max(0.3,Math.min(2.7,Math.acos(Math.max(-1,Math.min(1,wp.y/d)))));
+  cRTgt=Math.max(280,Math.min(520,d*3));
+  focusPending=true;
+}
+
 let drag=false,px,py,moved=false;
-renderer.domElement.addEventListener('pointerdown',e=>{drag=true;auto=false;moved=false;px=e.clientX;py=e.clientY;});
+renderer.domElement.addEventListener('pointerdown',e=>{drag=true;auto=false;focusPending=false;moved=false;px=e.clientX;py=e.clientY;});
 addEventListener('pointerup',()=>{drag=false;});
 addEventListener('pointermove',e=>{
   if(drag){
@@ -632,7 +652,7 @@ addEventListener('pointermove',e=>{
   }
   onHover(e);
 });
-renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();cR=Math.max(170,Math.min(950,cR*(1+Math.sign(e.deltaY)*.08)));},{passive:false});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();focusPending=false;cR=Math.max(170,Math.min(950,cR*(1+Math.sign(e.deltaY)*.08)));cRTgt=cR;},{passive:false});
 
 /* ═══════════════════════════════════════════════════════════
    HOVER + CLICK
@@ -671,10 +691,8 @@ function onHover(e){
   }
 }
 
-renderer.domElement.addEventListener('click',e=>{
-  if(moved)return;
-  const n=pick(e); if(!n)return;
-  selNode=n;
+function selectNode(n){
+  selNode=n; auto=false;
   const nb=neighborsOf(n).map(x=>x.label).filter(Boolean);
   const lockTag=n.locked?' <span style="color:var(--amber)">🔒</span>':'';
   locEl.innerHTML=
@@ -684,9 +702,20 @@ renderer.domElement.addEventListener('click',e=>{
     `<div class="x">highlighted in tree · click empty space to close</div>`;
   locEl.classList.add('show');
   highlightTreeRow(n.id);
-  auto=false;
+  focusNode(n);
+  const cnt=Math.min(neighborsOf(n).length*2+3,8);
+  for(let i=0;i<cnt;i++) setTimeout(()=>fireSignal(n),i*55);
+}
+function clearSelection(){
+  selNode=null;
+  locEl.classList.remove('show');
+  document.querySelectorAll('.row.active').forEach(r=>r.classList.remove('active'));
+  focusPending=false;
+}
+renderer.domElement.addEventListener('click',e=>{
+  if(moved) return;
+  const n=pick(e); if(n) selectNode(n); else clearSelection();
 });
-renderer.domElement.addEventListener('click',e=>{if(!pick(e)){locEl.classList.remove('show');selNode=null;}},true);
 
 /* ═══════════════════════════════════════════════════════════
    RENDER LOOP
@@ -710,7 +739,13 @@ function frame(){
     if(r.t<1){r.t+=.018;const s=16+r.t*220;r.m.scale.set(s,s,s);r.m.material.opacity=(1-r.t)*.4;r.m.quaternion.copy(camera.quaternion);}
     else r.m.material.opacity=0;
   });
-  if(auto)cT+=.0005; applyCam();
+  if(focusPending){
+    const k=0.07;
+    let dtT=cTTgt-cT; while(dtT>Math.PI)dtT-=2*Math.PI; while(dtT<-Math.PI)dtT+=2*Math.PI;
+    cT+=dtT*k; cP+=(cPTgt-cP)*k; cR+=(cRTgt-cR)*k;
+    if(Math.abs(dtT)<0.003&&Math.abs(cPTgt-cP)<0.003&&Math.abs(cRTgt-cR)<0.5) focusPending=false;
+  }
+  if(auto&&!focusPending)cT+=.0005; applyCam();
   const hk=Math.max(0.45,Math.min(2.6,440/cR));
   hudEl.style.transform='translate(-50%,-50%) scale('+hk.toFixed(3)+')';
   tickMind();
