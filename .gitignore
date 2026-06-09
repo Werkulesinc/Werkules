@@ -4,3 +4,4 @@ config/api_keys.json
 *.log
 memory/environment_state.json
 memory/long_term.json
+brain/embeddings_cache.json

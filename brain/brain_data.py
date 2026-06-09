@@ -9,6 +9,9 @@ VAULT_ROOT   = Path(r"C:\Werkules\vault")
 
 SKIP_DIRS = {"backups", ".venv", ".git", "__pycache__", "node_modules"}
 
+SEMANTIC_THRESHOLD = 0.75  # minimum cosine similarity to draw a semantic link
+SEMANTIC_TOP_N     = 3     # max semantic links kept per file
+
 _IMPORT_RE   = re.compile(r"^(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))", re.MULTILINE)
 _WIKILINK_RE = re.compile(r"\[\[([^\]|#]+?)(?:[|#][^\]]*)?\]\]")
 
@@ -115,9 +118,83 @@ def build_links(nodes: list) -> list:
     return links
 
 
+def _cosine(a: list, b: list) -> float:
+    if not a or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na  = sum(x * x for x in a) ** 0.5
+    nb  = sum(x * x for x in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
+def build_semantic_links(nodes: list) -> list:
+    try:
+        cache_path = Path(__file__).parent / "embeddings_cache.json"
+        if not cache_path.exists():
+            return []
+        try:
+            cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[semantic] cache unreadable: {e}")
+            return []
+
+        vectors: dict[str, list] = {}
+        ref_len: int | None = None
+        for nid, entry in cache.items():
+            vec = entry.get("vector") if isinstance(entry, dict) else None
+            if not isinstance(vec, list) or len(vec) == 0:
+                print(f"[semantic] skip {nid}: missing or empty vector "
+                      f"(likely rate-limited during embedding and never retried)")
+                continue
+            if not all(isinstance(v, (int, float)) for v in vec[:8]):
+                print(f"[semantic] skip {nid}: non-numeric values in vector")
+                continue
+            if ref_len is None:
+                ref_len = len(vec)
+            elif len(vec) != ref_len:
+                print(f"[semantic] skip {nid}: vector length {len(vec)} != {ref_len} "
+                      f"(model changed since last embed — re-run test_embeddings.py)")
+                continue
+            vectors[nid] = vec
+
+        if len(vectors) < 2:
+            return []
+
+        node_ids = [n["id"] for n in nodes if n["id"] in vectors]
+        seen  = set()
+        links = []
+
+        for i, src in enumerate(node_ids):
+            vec_a = vectors[src]
+            sims  = []
+            for j, tgt in enumerate(node_ids):
+                if i == j:
+                    continue
+                try:
+                    sim = _cosine(vec_a, vectors[tgt])
+                except Exception as e:
+                    print(f"[semantic] cosine error {src} ↔ {tgt}: {e}")
+                    continue
+                if sim >= SEMANTIC_THRESHOLD:
+                    sims.append((sim, tgt))
+            sims.sort(reverse=True)
+            for _, tgt in sims[:SEMANTIC_TOP_N]:
+                key = tuple(sorted([src, tgt]))
+                if key not in seen:
+                    seen.add(key)
+                    links.append({"source": src, "target": tgt, "type": "semantic"})
+
+        return links
+
+    except Exception as e:
+        print(f"[semantic] unexpected error — returning no semantic links: {e}")
+        return []
+
+
 def get_graph_data() -> dict:
     nodes = build_nodes()
     links = build_links(nodes)
+    links += build_semantic_links(nodes)
     return {"nodes": nodes, "links": links}
 
 

@@ -2,6 +2,8 @@ import os
 import json
 import asyncio
 import threading
+import ctypes
+import ctypes.wintypes
 import webview
 from pathlib import Path
 from brain.brain_data import BrainAPI, BrainWatcher, get_graph_data
@@ -60,6 +62,15 @@ class HeadlessUI:
 headless_ui = HeadlessUI()
 
 
+def _work_area():
+    rc = ctypes.wintypes.RECT()
+    ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(rc), 0)
+    return rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top
+
+
+_restore_bounds = None
+
+
 class AppAPI(BrainAPI):
     def set_win(self, win):
         self._win = win
@@ -68,10 +79,21 @@ class AppAPI(BrainAPI):
         self._win.minimize()
 
     def maximize_window(self):
-        self._win.maximize()
+        global _restore_bounds
+        _restore_bounds = (self._win.x, self._win.y, self._win.width, self._win.height)
+        x, y, w, h = _work_area()
+        self._win.move(x, y)
+        self._win.resize(w, h)
 
     def restore_window(self):
-        self._win.restore()
+        global _restore_bounds
+        if _restore_bounds:
+            x, y, w, h = _restore_bounds
+            self._win.move(x, y)
+            self._win.resize(w, h)
+        else:
+            self._win.move(60, 60)
+            self._win.resize(1280, 800)
 
     def close_window(self):
         self._win.destroy()

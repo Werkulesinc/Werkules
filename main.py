@@ -580,6 +580,7 @@ class JarvisLive:
         self._last_recv_time: float = 0.0
         self._force_reconnect = threading.Event()
         self._connected_once  = False
+        self._mic_retry_event: asyncio.Event | None = None
         self._ws_clients: set = set()
         _orig_log = self.ui.write_log
         def _ws_hook(text: str):
@@ -663,6 +664,8 @@ class JarvisLive:
                             self._on_text_command(text)
                     elif msg.get("type") == "set_mute":
                         self.ui.muted = bool(msg.get("muted", True))
+                        if not self.ui.muted and self._mic_retry_event:
+                            self._mic_retry_event.set()
             except Exception:
                 pass
             finally:
@@ -919,20 +922,25 @@ class JarvisLive:
                     {"data": data, "mime_type": "audio/pcm"}
                 )
 
-        try:
-            with sd.InputStream(
-                samplerate=SEND_SAMPLE_RATE,
-                channels=CHANNELS,
-                dtype="int16",
-                blocksize=CHUNK_SIZE,
-                callback=callback,
-            ):
-                print("[JARVIS] 🎤 Mic stream open")
-                while True:
-                    await asyncio.sleep(0.1)
-        except Exception as e:
-            print(f"[JARVIS] ❌ Mic: {e}")
-            raise
+        while True:
+            try:
+                with sd.InputStream(
+                    samplerate=SEND_SAMPLE_RATE,
+                    channels=CHANNELS,
+                    dtype="int16",
+                    blocksize=CHUNK_SIZE,
+                    callback=callback,
+                ):
+                    print("[JARVIS] 🎤 Mic stream open")
+                    while True:
+                        await asyncio.sleep(0.1)
+            except Exception as e:
+                print(f"[JARVIS] ❌ Mic: {e}")
+                self.ui.write_log("⚠ Mic unavailable — click the mic to retry")
+                self.ui.muted = True
+                if self._mic_retry_event:
+                    self._mic_retry_event.clear()
+                    await self._mic_retry_event.wait()
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Recv started")
@@ -1035,6 +1043,7 @@ class JarvisLive:
         # WS server runs for the lifetime of the process, independent of
         # the Gemini session. Starting it here means Gemini reconnects never
         # kill the browser connection.
+        self._mic_retry_event = asyncio.Event()
         asyncio.create_task(self._ws_server())
 
         while True:

@@ -85,7 +85,6 @@
   .row .ct{margin-left:auto;color:var(--cyan-dim);font-size:10px;
     background:rgba(62,224,138,.08);border-radius:8px;padding:0 5px;flex-shrink:0;}
   .fname{overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0;}
-  .lock-ico{font-size:9px;color:var(--amber);flex-shrink:0;}
   .row.pulse{animation:rowpulse 1.6s ease;}
   .row.active{background:rgba(62,224,138,.11);}
   .row[data-node-id]{cursor:pointer;}
@@ -276,7 +275,7 @@
       <button id="mic-btn" title="Talk to Jarvis">🎙</button>
       <div id="mic-label">click to talk</div>
       <!-- LEGEND -->
-      <div id="legend">🔒 program file (view-only)</div>
+      <div id="legend">program file (view-only)</div>
     </section>
     <!-- RIGHT CHAT -->
     <aside id="right">
@@ -403,9 +402,8 @@ function mkFileRow(n,lvl,fallbackColor){
   el.dataset.nodeId=n.id;
   const grp=nodeGroup(n);
   const color=GROUPS[grp]?.color||fallbackColor||'#9fb0cc';
-  const lock=n.locked?'<span class="lock-ico">🔒</span>':'';
   el.innerHTML=`<span class="car">·</span>`+
-    `<span class="fname" style="color:${color}">${n.name}</span>${lock}`;
+    `<span class="fname" style="color:${color}">${n.name}</span>`;
   return el;
 }
 
@@ -451,48 +449,10 @@ function glowTex(){
 }
 const GLOW=glowTex();
 
-function lockTex(){
-  const s=32,c=document.createElement('canvas');c.width=c.height=s;
-  const ctx=c.getContext('2d');
-  // shackle arc
-  ctx.beginPath();ctx.arc(16,14,6,Math.PI,0);
-  ctx.strokeStyle='rgba(255,196,107,1)';ctx.lineWidth=3;ctx.stroke();
-  // body
-  ctx.fillStyle='rgba(255,196,107,1)';ctx.fillRect(8,13,16,12);
-  // keyhole
-  ctx.fillStyle='rgba(4,7,15,0.85)';
-  ctx.beginPath();ctx.arc(16,19,2.5,0,Math.PI*2);ctx.fill();
-  ctx.fillRect(14.5,19,3,4);
-  return new THREE.CanvasTexture(c);
-}
-const LOCK_TEX=lockTex();
-
 // Galaxy group (tilted, slowly spinning)
 const galaxy=new THREE.Group(); galaxy.rotation.x=-0.35; galaxy.scale.setScalar(0.62); scene.add(galaxy);
 const nodesGroup=new THREE.Group(); galaxy.add(nodesGroup);
 
-// Dense granular star cloud (galaxy body) — UNCHANGED
-(function(){
-  const N=900,pos=new Float32Array(N*3),col=new Float32Array(N*3);
-  for(let i=0;i<N;i++){
-    const r=180*Math.pow(Math.random(),0.7),th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);
-    pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.cos(ph)*0.62; pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
-    const warm=1-r/200,clr=new THREE.Color().setHSL(0.42-warm*0.07,0.5,0.45+warm*0.4);
-    col[i*3]=clr.r;col[i*3+1]=clr.g;col[i*3+2]=clr.b;
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  galaxy.add(new THREE.Points(g,new THREE.PointsMaterial({size:1.6,vertexColors:true,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false})));
-})();
-
-// NOTE: nebula haze sprites intentionally removed (clean black background)
-
-// Far background stars
-const bgGeo=new THREE.BufferGeometry(),bp=new Float32Array(1500);
-for(let i=0;i<1500;i++)bp[i]=(Math.random()-.5)*3000;
-bgGeo.setAttribute('position',new THREE.BufferAttribute(bp,3));
-scene.add(new THREE.Points(bgGeo,new THREE.PointsMaterial({color:0x35564a,size:1.1,transparent:true,opacity:.5})));
 
 // Ripples
 const CORE={cur:new THREE.Vector3(0,0,0)};
@@ -523,14 +483,6 @@ function addNode(dn,flash){
   halo.scale.set(base*5.5,base*5.5,1);
 
   const g=new THREE.Group(); g.add(sph); g.add(halo);
-
-  // lock badge sprite for locked nodes
-  if(dn.locked){
-    const ls=new THREE.Sprite(new THREE.SpriteMaterial({map:LOCK_TEX,transparent:true,opacity:.85,depthWrite:false}));
-    ls.scale.set(base*3.2,base*3.2,1);
-    ls.position.set(base*1.0,base*1.15,0);
-    g.add(ls);
-  }
 
   nodesGroup.add(g);
   const dir=(CLUSTER_DIRS[grp]||new THREE.Vector3(1,0,0)).clone();
@@ -676,7 +628,7 @@ function onHover(e){
     hoverNode=n; renderer.domElement.style.cursor='pointer';
     const nb=neighborsOf(n).map(x=>x.label).filter(Boolean).slice(0,5);
     const gc=GROUPS[n.group]?.color||'#9fb0cc';
-    const vo=n.locked?'<div class="vo">🔒 view-only</div>':'';
+    const vo=n.locked?'<div class="vo">view-only</div>':'';
     hoverEl.innerHTML=
       `<div class="h">${n.label}</div>`+
       `<div class="a" style="color:${gc}">${n.group}</div>`+
@@ -694,9 +646,8 @@ function onHover(e){
 function selectNode(n){
   selNode=n; auto=false;
   const nb=neighborsOf(n).map(x=>x.label).filter(Boolean);
-  const lockTag=n.locked?' <span style="color:var(--amber)">🔒</span>':'';
   locEl.innerHTML=
-    `<div class="h">📍 ${n.label}${lockTag}</div>`+
+    `<div class="h">📍 ${n.label}</div>`+
     `<div class="p">${n.path}</div>`+
     (nb.length?`<div class="lk">↔ ${nb.join(', ')}</div>`:'')+
     `<div class="x">highlighted in tree · click empty space to close</div>`;
@@ -768,8 +719,8 @@ function frame(){
     const A=l.a.cur,B=l.b.cur;
     linkPos[vi++]=A.x;linkPos[vi++]=A.y;linkPos[vi++]=A.z;
     linkPos[vi++]=B.x;linkPos[vi++]=B.y;linkPos[vi++]=B.z;
-    const c=new THREE.Color(GROUPS[l.a.group]?.hex||0x3ee08a);
-    const lit=hiSet&&hiSet.has(l.a)&&hiSet.has(l.b);const k=lit?2.2:1;
+    const c=l.type==='semantic'?new THREE.Color(0xaa66ff):new THREE.Color(GROUPS[l.a.group]?.hex||0x3ee08a);
+    const lit=hiSet&&hiSet.has(l.a)&&hiSet.has(l.b);const k=l.type==='semantic'?(lit?.90:.55):(lit?2.2:1);
     for(let q=0;q<2;q++){linkCol[ci++]=c.r*k;linkCol[ci++]=c.g*k;linkCol[ci++]=c.b*k;}
   });
   if(linkGeo){linkGeo.attributes.position.needsUpdate=true;linkGeo.attributes.color.needsUpdate=true;}
@@ -952,14 +903,20 @@ function initGraph(data){
   ),1200);
 }
 
-function waitAndLoad(){
+function waitAndLoad(attempt){
   if(window.pywebview&&window.pywebview.api){
-    window.pywebview.api.get_graph().then(initGraph).catch(err=>console.error('get_graph error',err));
+    window.pywebview.api.get_graph()
+      .then(initGraph)
+      .catch(err=>{
+        const msg=err&&err.message||String(err);
+        if(attempt<4) setTimeout(()=>waitAndLoad(attempt+1),2000);
+        else jarvis('⚠ Brain data failed after 5 tries: '+msg);
+      });
   } else {
-    setTimeout(waitAndLoad,80);
+    setTimeout(()=>waitAndLoad(attempt),80);
   }
 }
-waitAndLoad();
+waitAndLoad(0);
 
 /* ═══════════════════════════════════════════════════════════
    JARVIS WEBSOCKET BRIDGE
