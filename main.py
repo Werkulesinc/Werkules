@@ -629,8 +629,6 @@ class JarvisLive:
             if self._force_reconnect.is_set():
                 self._force_reconnect.clear()
                 raise ConnectionError("Sleep/wake detected — reconnecting")
-            if self._last_recv_time > 0 and (time.monotonic() - self._last_recv_time) > 90:
-                raise ConnectionError("No Gemini activity for 90s — reconnecting")
 
     async def _ws_broadcast(self, msg: dict):
         if not self._ws_clients:
