@@ -38,15 +38,41 @@
   #btn-close:hover{background:rgba(255,60,60,.2);color:#ff5555;}
 
   #wrap{position:fixed;inset:0;display:flex;flex-direction:column;}
-  #main{flex:1 1 auto;display:flex;min-height:0;position:relative;}
-  .splitter{flex:0 0 6px;cursor:col-resize;background:transparent;position:relative;z-index:7;transition:background .15s;}
-  .splitter::after{content:"";position:absolute;left:2px;top:0;bottom:0;width:2px;background:var(--line);}
-  .splitter:hover::after,.splitter.active::after{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
-  #main.resizing{cursor:col-resize;user-select:none;}
+  #main{flex:1 1 auto;position:relative;overflow:hidden;}
+
+  /* ── PANEL HANDLES ── */
+  .panel-handle{position:absolute;top:0;bottom:0;width:6px;z-index:8;cursor:col-resize;background:transparent;}
+  .panel-handle::after{content:"";position:absolute;top:0;bottom:0;left:2px;width:2px;background:var(--line);transition:background .15s,box-shadow .15s;}
+  .panel-handle:hover::after,.panel-handle.dragging::after{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+  #lh{right:0;} #rh{left:0;}
+
+  /* ── EDGE TABS (shown when panel fully closed) ── */
+  .edge-tab{
+    position:absolute;top:50%;transform:translateY(-50%);width:18px;height:64px;z-index:9;
+    cursor:pointer;background:rgba(8,20,15,.92);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--cyan);font-size:13px;
+    opacity:0;pointer-events:none;transition:opacity .2s,background .15s;
+  }
+  .edge-tab:hover{background:rgba(62,224,138,.14);border-color:rgba(62,224,138,.5);}
+  #left-tab{left:0;border-left:none;border-radius:0 6px 6px 0;}
+  #right-tab{right:0;border-right:none;border-radius:6px 0 0 6px;}
+  .edge-tab.show{opacity:1;pointer-events:auto;}
+
+  /* ── PANEL TOGGLE BUTTONS ── */
+  .panel-toggle{
+    background:transparent;border:1px solid var(--line);border-radius:4px;
+    color:var(--cyan);font-family:var(--font);font-size:12px;cursor:pointer;
+    width:22px;height:20px;padding:0;line-height:1;
+    transition:.15s;flex-shrink:0;
+  }
+  .panel-toggle:hover{background:rgba(62,224,138,.12);border-color:var(--cyan);}
 
   /* ── LEFT TREE ── */
-  #left{flex:0 0 260px;display:flex;flex-direction:column;border-right:1px solid var(--line);
-    background:linear-gradient(180deg,rgba(8,20,15,.45),rgba(2,6,4,.25));overflow:hidden;}
+  #left{position:absolute;left:0;top:0;bottom:0;width:260px;z-index:5;
+    display:flex;flex-direction:column;border-right:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(8,20,15,.93),rgba(2,6,4,.90));overflow:hidden;
+    transition:width .25s ease;}
   .lhead{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;
     border-bottom:1px solid var(--line);}
   .lhead b{color:var(--cyan);letter-spacing:2px;font-size:11px;}
@@ -68,7 +94,7 @@
   }
 
   /* ── CENTER CANVAS ── */
-  #center{flex:1 1 auto;position:relative;min-width:0;}
+  #center{position:absolute;inset:0;}
   #center canvas{display:block;}
 
   /* HUD rings */
@@ -132,8 +158,10 @@
   }
 
   /* ── RIGHT PANEL ── */
-  #right{flex:0 0 360px;display:flex;flex-direction:column;border-left:1px solid var(--line);
-    background:linear-gradient(180deg,rgba(8,20,15,.45),rgba(2,6,4,.25));overflow:hidden;}
+  #right{position:absolute;right:0;top:0;bottom:0;width:360px;z-index:5;
+    display:flex;flex-direction:column;border-left:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(8,20,15,.93),rgba(2,6,4,.90));overflow:hidden;
+    transition:width .25s ease;}
   .rhead{padding:10px 14px;border-bottom:1px solid var(--line);color:var(--cyan);
     letter-spacing:2px;font-size:12px;display:flex;justify-content:space-between;}
   .rhead .on{color:var(--green);}
@@ -194,15 +222,16 @@
   <div id="main">
     <!-- LEFT TREE -->
     <aside id="left">
+      <div id="lh" class="panel-handle"></div>
       <div class="lhead">
         <b>◈ DIGITAL BRAIN</b>
-        <span style="color:var(--dim);font-size:10px">live mirror</span>
+        <span style="color:var(--dim);font-size:10px;flex:1;margin:0 6px">live mirror</span>
+        <button class="panel-toggle" id="toggle-left" title="Collapse">«</button>
       </div>
       <div class="tree" id="tree">
         <div class="row" style="color:var(--dim);padding:12px 8px;font-size:11px">loading…</div>
       </div>
     </aside>
-    <div class="splitter" id="splitL" title="drag to resize"></div>
 
     <!-- CENTER GALAXY -->
     <section id="center">
@@ -247,11 +276,14 @@
       <!-- LEGEND -->
       <div id="legend">🔒 program file (view-only)</div>
     </section>
-    <div class="splitter" id="splitR" title="drag to resize"></div>
-
     <!-- RIGHT CHAT -->
     <aside id="right">
-      <div class="rhead"><span>▸ JARVIS</span><span class="on">● online</span></div>
+      <div id="rh" class="panel-handle"></div>
+      <div class="rhead">
+        <button class="panel-toggle" id="toggle-right" title="Collapse">»</button>
+        <span style="flex:1;margin:0 6px">▸ JARVIS</span>
+        <span class="on">● online</span>
+      </div>
       <div id="chat"></div>
       <div id="tray"></div>
       <div id="inputbar">
@@ -262,6 +294,9 @@
       <input id="fileInput" type="file" multiple hidden>
       <div id="drop"><div>⬇ Drop files to feed the brain</div></div>
     </aside>
+    <!-- Edge tabs — visible only when the panel is fully closed -->
+    <div id="left-tab" class="edge-tab" title="Open files tree">»</div>
+    <div id="right-tab" class="edge-tab" title="Open Jarvis chat">«</div>
   </div>
 </div>
 
@@ -775,23 +810,55 @@ ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefa
 ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(120,ta.scrollHeight)+'px';});
 
 /* ═══════════════════════════════════════════════════════════
-   SPLITTERS
+   PANEL CURTAINS — overlay drag resize + collapse/expand
 ═══════════════════════════════════════════════════════════ */
-const mainEl=document.getElementById('main'),leftEl=document.getElementById('left');
-function makeSplitter(el,side){
-  let on=false;
-  el.addEventListener('pointerdown',e=>{on=true;el.classList.add('active');mainEl.classList.add('resizing');el.setPointerCapture(e.pointerId);});
-  el.addEventListener('pointermove',e=>{if(!on)return;
-    const r=mainEl.getBoundingClientRect();
-    if(side==='left'){let w=e.clientX-r.left;w=Math.max(0,Math.min(r.width-340,w));leftEl.style.flexBasis=w+'px';}
-    else{let w=r.right-e.clientX;w=Math.max(0,Math.min(r.width-340,w));rightEl.style.flexBasis=w+'px';}
-    resize();
-  });
-  const end=()=>{if(on){on=false;el.classList.remove('active');mainEl.classList.remove('resizing');setTimeout(resize,50);}};
-  el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end);
+const mainEl=document.getElementById('main');
+const lPanel=document.getElementById('left'),rPanel=document.getElementById('right');
+const leftTab=document.getElementById('left-tab'),rightTab=document.getElementById('right-tab');
+let leftW=260,rightW=360;
+
+function setLeftW(w,animate){
+  w=Math.max(0,Math.min(mainEl.clientWidth*.6,w));
+  lPanel.style.transition=animate?'':'none';
+  lPanel.style.width=w+'px';
+  if(w>=10) leftW=w;
+  leftTab.classList.toggle('show',w<10);
 }
-makeSplitter(document.getElementById('splitL'),'left');
-makeSplitter(document.getElementById('splitR'),'right');
+function setRightW(w,animate){
+  w=Math.max(0,Math.min(mainEl.clientWidth*.6,w));
+  rPanel.style.transition=animate?'':'none';
+  rPanel.style.width=w+'px';
+  if(w>=10) rightW=w;
+  rightTab.classList.toggle('show',w<10);
+}
+
+function makePanelDrag(handleId,side){
+  const h=document.getElementById(handleId);
+  h.addEventListener('pointerdown',e=>{
+    e.preventDefault();h.classList.add('dragging');h.setPointerCapture(e.pointerId);
+    const r=mainEl.getBoundingClientRect();
+    function mv(e){side==='left'?setLeftW(e.clientX-r.left,false):setRightW(r.right-e.clientX,false);}
+    function up(){
+      h.classList.remove('dragging');
+      (side==='left'?lPanel:rPanel).style.transition='';
+      h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);
+    }
+    h.addEventListener('pointermove',mv);h.addEventListener('pointerup',up);
+  });
+}
+makePanelDrag('lh','left');
+makePanelDrag('rh','right');
+
+document.getElementById('toggle-left').addEventListener('click',()=>{
+  const cur=parseInt(lPanel.style.width)||leftW;
+  cur>=10?(leftW=cur,setLeftW(0,true)):setLeftW(leftW,true);
+});
+document.getElementById('toggle-right').addEventListener('click',()=>{
+  const cur=parseInt(rPanel.style.width)||rightW;
+  cur>=10?(rightW=cur,setRightW(0,true)):setRightW(rightW,true);
+});
+leftTab.addEventListener('click',()=>setLeftW(leftW,true));
+rightTab.addEventListener('click',()=>setRightW(rightW,true));
 
 /* ═══════════════════════════════════════════════════════════
    CLOCK
