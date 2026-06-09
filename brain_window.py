@@ -135,6 +135,7 @@ window = webview.create_window(
     js_api=api,
     maximized=True,
     frameless=True,
+    easy_drag=False,
 )
 
 def on_started():

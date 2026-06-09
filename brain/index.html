@@ -14,7 +14,7 @@
     --font:'Share Tech Mono',ui-monospace,monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-app-region:no-drag;}
 
   /* ── FRAMELESS TITLE BAR ── */
   #titlebar{
@@ -72,7 +72,7 @@
   #left{position:absolute;left:0;top:0;bottom:0;width:260px;z-index:5;
     display:flex;flex-direction:column;border-right:1px solid var(--line);
     background:linear-gradient(180deg,rgba(8,20,15,.93),rgba(2,6,4,.90));overflow:hidden;
-    transition:width .25s ease;}
+    transition:width .25s ease;-webkit-app-region:no-drag;}
   .lhead{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;
     border-bottom:1px solid var(--line);}
   .lhead b{color:var(--cyan);letter-spacing:2px;font-size:11px;}
@@ -95,7 +95,7 @@
   }
 
   /* ── CENTER CANVAS ── */
-  #center{position:absolute;inset:0;}
+  #center{position:absolute;inset:0;-webkit-app-region:no-drag;}
   #center canvas{display:block;}
 
   /* HUD rings */
@@ -162,17 +162,19 @@
   #right{position:absolute;right:0;top:0;bottom:0;width:360px;z-index:5;
     display:flex;flex-direction:column;border-left:1px solid var(--line);
     background:linear-gradient(180deg,rgba(8,20,15,.93),rgba(2,6,4,.90));overflow:hidden;
-    transition:width .25s ease;}
+    transition:width .25s ease;-webkit-app-region:no-drag;}
   .rhead{padding:10px 14px;border-bottom:1px solid var(--line);color:var(--cyan);
     letter-spacing:2px;font-size:12px;display:flex;justify-content:space-between;}
   .rhead .on{color:var(--green);}
   #chat{flex:1 1 auto;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:7px;
-    font-size:13px;line-height:1.55;}
+    font-size:13px;line-height:1.55;user-select:text;-webkit-user-select:text;}
   .line{animation:fade .25s ease;white-space:pre-wrap;word-wrap:break-word;}
   .line .who{letter-spacing:1px;}
   .line.you{color:#d6efe4;}.line.you .who{color:#9fd2b8;}
   .line.jarvis{color:var(--cyan-soft);}.line.jarvis .who{color:var(--cyan);}
   .line.sys{color:var(--dim);font-size:12px;}.line.sys b{color:var(--cyan-soft);}
+  @keyframes thinking{0%,100%{opacity:.35}50%{opacity:.9}}
+  .thinking-line{color:var(--dim);font-style:italic;animation:thinking 1.4s ease infinite !important;}
   .cursor{animation:blink 1s steps(1) infinite;}
   @keyframes blink{50%{opacity:0;}}
   @keyframes fade{from{opacity:0;}to{opacity:1;}}
@@ -748,6 +750,10 @@ let ws=null;
 const chatEl=document.getElementById('chat');
 function scrollChat(){chatEl.scrollTop=chatEl.scrollHeight;}
 function addLine(cls,html){const d=document.createElement('div');d.className='line '+cls;d.innerHTML=html;chatEl.appendChild(d);scrollChat();return d;}
+let thinkEl=null;
+function showThinking(){if(thinkEl)return;thinkEl=addLine('sys thinking-line','Jarvis is working…');}
+function hideThinking(){if(thinkEl){thinkEl.remove();thinkEl=null;}}
+function updateState(s){if(s==='THINKING'||s==='PROCESSING')showThinking();else hideThinking();}
 function jarvis(text){
   const d=addLine('jarvis','<span class="who">Jarvis:</span> <span class="t"></span><span class="cursor">▋</span>');
   const tEl=d.querySelector('.t'),cur=d.querySelector('.cursor');
@@ -923,12 +929,13 @@ waitAndLoad(0);
 ═══════════════════════════════════════════════════════════ */
 function initWS(){
   ws=new WebSocket('ws://127.0.0.1:7701');
-  ws.onopen=()=>{addLine('sys','<b>Jarvis link established.</b>');ws.send(JSON.stringify({type:'set_mute',muted:!micLive}));};
+  ws.onopen=()=>{addLine('sys','<b>Jarvis link established.</b>');ws.send(JSON.stringify({type:'set_mute',muted:!micLive}));if(nodes.length===0)waitAndLoad(0);};
   ws.onmessage=e=>{
     try{
       const d=JSON.parse(e.data);
-      if(d.type==='jarvis'&&d.text) jarvis(d.text);
+      if(d.type==='jarvis'&&d.text){hideThinking();jarvis(d.text);}
       else if(d.type==='you'&&d.text) addLine('you','<span class="who">You:</span> '+d.text.replace(/</g,'&lt;'));
+      else if(d.type==='state') updateState(d.state);
     }catch(err){}
   };
   ws.onclose=()=>{addLine('sys','<b>Jarvis link lost — reconnecting…</b>');setTimeout(initWS,3000);};

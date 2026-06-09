@@ -593,6 +593,14 @@ class JarvisLive:
             if msg and self._loop:
                 asyncio.run_coroutine_threadsafe(self._ws_broadcast(msg), self._loop)
         self.ui.write_log = _ws_hook
+        _orig_set_state = self.ui.set_state
+        def _ws_state_hook(state: str):
+            _orig_set_state(state)
+            if self._loop:
+                asyncio.run_coroutine_threadsafe(
+                    self._ws_broadcast({"type": "state", "state": state}), self._loop
+                )
+        self.ui.set_state = _ws_state_hook
         self._start_sleep_watcher()
 
     def _on_text_command(self, text: str):
