@@ -134,23 +134,23 @@
   #mic-btn{
     position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:10;
     width:60px;height:60px;border-radius:50%;
-    border:2px solid var(--green);background:rgba(4,7,15,0.88);
-    color:var(--green);font-size:26px;cursor:pointer;
+    border:2px solid rgba(255,68,68,.45);background:rgba(4,7,15,0.88);
+    color:rgba(255,68,68,.55);font-size:26px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
-    transition:border-color .2s,color .2s;backdrop-filter:blur(6px);
+    transition:border-color .2s,color .2s,box-shadow .2s;backdrop-filter:blur(6px);
   }
-  #mic-btn:hover{box-shadow:0 0 20px rgba(62,224,138,.3);}
-  #mic-btn.live{border-color:#ff4444;color:#fff;animation:micpulse 1.2s ease infinite;}
+  #mic-btn:hover{box-shadow:0 0 14px rgba(255,68,68,.25);}
+  #mic-btn.live{border-color:var(--green);color:var(--green);animation:micpulse 1.2s ease infinite;}
   @keyframes micpulse{
-    0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,.55);}
-    50%{box-shadow:0 0 0 16px rgba(255,68,68,0);}
+    0%,100%{box-shadow:0 0 0 0 rgba(62,224,138,.55);}
+    50%{box-shadow:0 0 0 16px rgba(62,224,138,0);}
   }
   #mic-label{
     position:absolute;bottom:84px;left:50%;transform:translateX(-50%);z-index:10;
     font-size:10px;color:var(--dim);letter-spacing:2px;pointer-events:none;white-space:nowrap;
     transition:color .2s;
   }
-  #mic-label.live{color:#ff8888;}
+  #mic-label.live{color:var(--green);}
 
   /* ── LEGEND ── */
   #legend{
@@ -907,7 +907,7 @@ micBtn.addEventListener('click',()=>{
   micLabel.textContent=micLive?'listening…':'click to talk';
   if(micLive) setMind('thinking',999999);
   else        setMind('idle',0);
-  if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'mic_toggle'}));
+  if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'set_mute',muted:!micLive}));
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -966,7 +966,7 @@ waitAndLoad();
 ═══════════════════════════════════════════════════════════ */
 function initWS(){
   ws=new WebSocket('ws://127.0.0.1:7701');
-  ws.onopen=()=>addLine('sys','<b>Jarvis link established.</b>');
+  ws.onopen=()=>{addLine('sys','<b>Jarvis link established.</b>');ws.send(JSON.stringify({type:'set_mute',muted:!micLive}));};
   ws.onmessage=e=>{
     try{
       const d=JSON.parse(e.data);
