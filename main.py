@@ -580,6 +580,18 @@ class JarvisLive:
         self._last_recv_time: float = 0.0
         self._force_reconnect = threading.Event()
         self._connected_once  = False
+        self._ws_clients: set = set()
+        _orig_log = self.ui.write_log
+        def _ws_hook(text: str):
+            _orig_log(text)
+            msg = None
+            if text.startswith("Jarvis: "):
+                msg = {"type": "jarvis", "text": text[8:]}
+            elif text.startswith("You: "):
+                msg = {"type": "you", "text": text[5:]}
+            if msg and self._loop:
+                asyncio.run_coroutine_threadsafe(self._ws_broadcast(msg), self._loop)
+        self.ui.write_log = _ws_hook
         self._start_sleep_watcher()
 
     def _on_text_command(self, text: str):
@@ -619,6 +631,49 @@ class JarvisLive:
                 raise ConnectionError("Sleep/wake detected — reconnecting")
             if self._last_recv_time > 0 and (time.monotonic() - self._last_recv_time) > 90:
                 raise ConnectionError("No Gemini activity for 90s — reconnecting")
+
+    async def _ws_broadcast(self, msg: dict):
+        if not self._ws_clients:
+            return
+        dead = set()
+        data = json.dumps(msg)
+        for client in list(self._ws_clients):
+            try:
+                await client.send(data)
+            except Exception:
+                dead.add(client)
+        self._ws_clients -= dead
+
+    async def _ws_server(self):
+        try:
+            from websockets.asyncio.server import serve as ws_serve
+        except ImportError:
+            print("[BRAIN-WS] websockets asyncio API not available — brain chat disabled")
+            return
+
+        async def _handler(conn):
+            self._ws_clients.add(conn)
+            try:
+                async for raw in conn:
+                    try:
+                        msg = json.loads(raw)
+                    except Exception:
+                        continue
+                    if msg.get("type") == "text":
+                        text = msg.get("text", "").strip()
+                        if text:
+                            self._on_text_command(text)
+            except Exception:
+                pass
+            finally:
+                self._ws_clients.discard(conn)
+
+        print("[BRAIN-WS] 🌐 Starting on ws://127.0.0.1:7701")
+        try:
+            async with ws_serve(_handler, "127.0.0.1", 7701):
+                await asyncio.Future()
+        except OSError as e:
+            print(f"[BRAIN-WS] ⚠️  Port 7701 unavailable: {e}")
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -992,6 +1047,7 @@ class JarvisLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._watchdog())
+                    tg.create_task(self._ws_server())
 
             except Exception as e:
                 print(f"[JARVIS] ⚠️ {e}")

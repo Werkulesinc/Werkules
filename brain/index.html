@@ -758,6 +758,7 @@ window.werkulesUpdate=function(data){
 /* ═══════════════════════════════════════════════════════════
    CHAT
 ═══════════════════════════════════════════════════════════ */
+let ws=null;
 const chatEl=document.getElementById('chat');
 function scrollChat(){chatEl.scrollTop=chatEl.scrollHeight;}
 function addLine(cls,html){const d=document.createElement('div');d.className='line '+cls;d.innerHTML=html;chatEl.appendChild(d);scrollChat();return d;}
@@ -771,15 +772,7 @@ function jarvis(text){
   },450);
 }
 function respond(q){
-  const s=q.toLowerCase();
-  if(/vault|note/.test(s)){
-    const vn=nodes.filter(n=>!n.locked).map(n=>n.label);
-    jarvis('Vault has '+vn.length+' editable notes: '+(vn.join(', ')||'none')+'. Click any gold star to locate it.');
-  } else if(/status|how many|brain|file/.test(s)){
-    jarvis('Brain live-mirrors '+nodes.length+' files — '+nodes.filter(n=>n.locked).length+' locked code nodes, '+nodes.filter(n=>!n.locked).length+' editable vault notes. '+links.length+' connections active.');
-  } else {
-    jarvis('Got it. The brain is live-mirroring your '+nodes.length+' files. '+links.length+' connections mapped. Drop files or ask me anything.');
-  }
+  if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'text',text:q}));
 }
 let pending=[];
 const tray=document.getElementById('tray');
@@ -931,6 +924,24 @@ function waitAndLoad(){
   }
 }
 waitAndLoad();
+
+/* ═══════════════════════════════════════════════════════════
+   JARVIS WEBSOCKET BRIDGE
+═══════════════════════════════════════════════════════════ */
+function initWS(){
+  ws=new WebSocket('ws://127.0.0.1:7701');
+  ws.onopen=()=>addLine('sys','<b>Jarvis link established.</b>');
+  ws.onmessage=e=>{
+    try{
+      const d=JSON.parse(e.data);
+      if(d.type==='jarvis'&&d.text) jarvis(d.text);
+      else if(d.type==='you'&&d.text) addLine('you','<span class="who">You:</span> '+d.text.replace(/</g,'&lt;'));
+    }catch(err){}
+  };
+  ws.onclose=()=>{addLine('sys','<b>Jarvis link lost — reconnecting…</b>');setTimeout(initWS,3000);};
+  ws.onerror=()=>{};
+}
+initWS();
 </script>
 </body>
 </html>
