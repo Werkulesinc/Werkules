@@ -668,12 +668,24 @@ class JarvisLive:
             finally:
                 self._ws_clients.discard(conn)
 
-        print("[BRAIN-WS] 🌐 Starting on ws://127.0.0.1:7701")
-        try:
-            async with ws_serve(_handler, "127.0.0.1", 7701):
-                await asyncio.Future()
-        except OSError as e:
-            print(f"[BRAIN-WS] ⚠️  Port 7701 unavailable: {e}")
+        # Retry loop: survive port-in-use and unexpected errors without dying.
+        # CancelledError is re-raised so the task exits cleanly on program shutdown.
+        while True:
+            print("[BRAIN-WS] 🌐 Starting on ws://127.0.0.1:7701")
+            try:
+                async with ws_serve(
+                    _handler, "127.0.0.1", 7701,
+                    ping_interval=20, ping_timeout=20,
+                ):
+                    await asyncio.Future()
+            except asyncio.CancelledError:
+                raise
+            except OSError as e:
+                print(f"[BRAIN-WS] ⚠️  Port 7701 unavailable: {e} — retrying in 5s")
+                await asyncio.sleep(5)
+            except Exception as e:
+                print(f"[BRAIN-WS] ⚠️  Server error: {e} — retrying in 5s")
+                await asyncio.sleep(5)
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -1020,6 +1032,11 @@ class JarvisLive:
             http_options={"api_version": "v1beta"}
         )
 
+        # WS server runs for the lifetime of the process, independent of
+        # the Gemini session. Starting it here means Gemini reconnects never
+        # kill the browser connection.
+        asyncio.create_task(self._ws_server())
+
         while True:
             try:
                 print("[JARVIS] 🔌 Connecting...")
@@ -1047,7 +1064,6 @@ class JarvisLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._watchdog())
-                    tg.create_task(self._ws_server())
 
             except Exception as e:
                 print(f"[JARVIS] ⚠️ {e}")
