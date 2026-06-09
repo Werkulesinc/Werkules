@@ -152,9 +152,6 @@
   }
   #mic-label.live{color:var(--green);}
 
-  /* ── EDGE+CORNER RESIZE ZONES ── */
-  .rz{position:fixed;z-index:200;}
-
   /* ── LEGEND ── */
   #legend{
     position:absolute;bottom:18px;left:12px;z-index:8;font-size:10px;color:var(--dim);
@@ -304,15 +301,6 @@
     <div id="right-tab" class="edge-tab" title="Open Jarvis chat">«</div>
   </div>
 </div>
-<!-- EDGE + CORNER RESIZE ZONES (outside #wrap, position:fixed, z-index:200) -->
-<div class="rz" id="rz-n"  style="top:0;left:12px;right:12px;height:6px;cursor:ns-resize;"></div>
-<div class="rz" id="rz-s"  style="bottom:0;left:12px;right:12px;height:6px;cursor:ns-resize;"></div>
-<div class="rz" id="rz-w"  style="top:12px;bottom:12px;left:0;width:6px;cursor:ew-resize;"></div>
-<div class="rz" id="rz-e"  style="top:12px;bottom:12px;right:0;width:6px;cursor:ew-resize;"></div>
-<div class="rz" id="rz-nw" style="top:0;left:0;width:12px;height:12px;cursor:nwse-resize;"></div>
-<div class="rz" id="rz-ne" style="top:0;right:0;width:12px;height:12px;cursor:nesw-resize;"></div>
-<div class="rz" id="rz-sw" style="bottom:0;left:0;width:12px;height:12px;cursor:nesw-resize;"></div>
-<div class="rz" id="rz-se" style="bottom:0;right:0;width:12px;height:12px;cursor:nwse-resize;"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -992,29 +980,35 @@ function initWS(){
 initWS();
 
 /* ═══════════════════════════════════════════════════════════
-   EDGE + CORNER RESIZE
+   EDGE + CORNER RESIZE  (proximity detection — no overlay)
+   Cursor-near-edge is detected on every pointermove; the zones
+   are invisible and carry no pointer-events, so wheel-zoom and
+   text-selection pass through at all times.  During an active
+   drag the capture-phase listener stops propagation so the
+   Three.js orbit controls never see the events.
 ═══════════════════════════════════════════════════════════ */
 (()=>{
   const api=()=>window.pywebview&&window.pywebview.api;
-  let drag=null,last=0,pendingId=0;
+  const T=6,C=12; // edge / corner threshold px
+  const CURSOR={n:'ns-resize',s:'ns-resize',w:'ew-resize',e:'ew-resize',
+                nw:'nwse-resize',se:'nwse-resize',ne:'nesw-resize',sw:'nesw-resize'};
 
-  [['rz-n','n'],['rz-s','s'],['rz-w','w'],['rz-e','e'],
-   ['rz-nw','nw'],['rz-ne','ne'],['rz-sw','sw'],['rz-se','se']
-  ].forEach(([id,side])=>{
-    const el=document.getElementById(id);
-    if(!el) return;
+  function getZone(x,y){
+    const W=window.innerWidth,H=window.innerHeight;
+    const L=x<C,R=x>W-C,Tp=y<C,B=y>H-C;
+    if(Tp&&L) return 'nw'; if(Tp&&R) return 'ne';
+    if(B&&L)  return 'sw'; if(B&&R)  return 'se';
+    if(x<T)   return 'w';  if(x>W-T) return 'e';
+    if(y<T)   return 'n';  if(y>H-T) return 's';
+    return null;
+  }
 
-    el.addEventListener('pointerdown',async e=>{
-      e.stopPropagation(); e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      const myId=++pendingId, sx=e.screenX, sy=e.screenY;
-      if(!api()) return;
-      const b=await api().get_bounds();
-      if(pendingId===myId) drag={side,sx,sy,bx:b.x,by:b.y,bw:b.w,bh:b.h};
-    });
+  let zone=null,drag=null,last=0,pendingId=0;
 
-    el.addEventListener('pointermove',e=>{
-      if(!drag) return;
+  // capture:true → fires before canvas/chat see the event
+  document.addEventListener('pointermove',e=>{
+    if(drag){
+      e.stopPropagation(); // keep orbit controls idle during resize
       const now=Date.now(); if(now-last<32) return; last=now;
       const dx=e.screenX-drag.sx, dy=e.screenY-drag.sy;
       let {bx,by,bw,bh,side:s}=drag;
@@ -1023,10 +1017,25 @@ initWS();
       if(s.includes('w')){const nw=Math.max(700,bw-dx);bx+=bw-nw;bw=nw;}
       if(s.includes('n')){const nh=Math.max(500,bh-dy);by+=bh-nh;bh=nh;}
       if(api()) api().set_bounds(Math.round(bx),Math.round(by),Math.round(bw),Math.round(bh));
-    });
+      return;
+    }
+    const z=getZone(e.clientX,e.clientY);
+    if(z!==zone){zone=z; document.body.style.cursor=z?CURSOR[z]:'';}
+  },{capture:true});
 
-    el.addEventListener('pointerup',()=>{pendingId++;drag=null;});
-  });
+  document.addEventListener('pointerdown',async e=>{
+    if(!zone) return;                          // not near any edge — pass through
+    e.stopPropagation(); e.preventDefault();
+    document.body.setPointerCapture(e.pointerId); // reliable tracking even at speed
+    const myId=++pendingId, sx=e.screenX, sy=e.screenY, side=zone;
+    if(!api()) return;
+    const b=await api().get_bounds();
+    if(pendingId===myId) drag={side,sx,sy,bx:b.x,by:b.y,bw:b.w,bh:b.h};
+  },{capture:true});
+
+  document.addEventListener('pointerup',()=>{
+    pendingId++; drag=null; zone=null; document.body.style.cursor='';
+  },{capture:true});
 })();
 </script>
 </body>
