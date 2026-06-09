@@ -152,15 +152,8 @@
   }
   #mic-label.live{color:var(--green);}
 
-  /* ── RESIZE GRIP ── */
-  #resize-grip{
-    position:fixed;bottom:0;right:0;width:16px;height:16px;z-index:50;cursor:nwse-resize;
-    background:repeating-linear-gradient(
-      135deg,
-      transparent,transparent 3px,
-      rgba(62,224,138,.35) 3px,rgba(62,224,138,.35) 4px
-    );
-  }
+  /* ── EDGE+CORNER RESIZE ZONES ── */
+  .rz{position:fixed;z-index:200;}
 
   /* ── LEGEND ── */
   #legend{
@@ -311,7 +304,15 @@
     <div id="right-tab" class="edge-tab" title="Open Jarvis chat">«</div>
   </div>
 </div>
-<div id="resize-grip"></div>
+<!-- EDGE + CORNER RESIZE ZONES (outside #wrap, position:fixed, z-index:200) -->
+<div class="rz" id="rz-n"  style="top:0;left:12px;right:12px;height:6px;cursor:ns-resize;"></div>
+<div class="rz" id="rz-s"  style="bottom:0;left:12px;right:12px;height:6px;cursor:ns-resize;"></div>
+<div class="rz" id="rz-w"  style="top:12px;bottom:12px;left:0;width:6px;cursor:ew-resize;"></div>
+<div class="rz" id="rz-e"  style="top:12px;bottom:12px;right:0;width:6px;cursor:ew-resize;"></div>
+<div class="rz" id="rz-nw" style="top:0;left:0;width:12px;height:12px;cursor:nwse-resize;"></div>
+<div class="rz" id="rz-ne" style="top:0;right:0;width:12px;height:12px;cursor:nesw-resize;"></div>
+<div class="rz" id="rz-sw" style="bottom:0;left:0;width:12px;height:12px;cursor:nesw-resize;"></div>
+<div class="rz" id="rz-se" style="bottom:0;right:0;width:12px;height:12px;cursor:nwse-resize;"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -991,25 +992,41 @@ function initWS(){
 initWS();
 
 /* ═══════════════════════════════════════════════════════════
-   RESIZE GRIP
+   EDGE + CORNER RESIZE
 ═══════════════════════════════════════════════════════════ */
 (()=>{
-  const grip=document.getElementById('resize-grip');
-  let dragging=false,sx=0,sy=0,sw=0,sh=0,last=0;
-  grip.addEventListener('pointerdown',e=>{
-    e.stopPropagation();
-    dragging=true; sx=e.clientX; sy=e.clientY;
-    sw=window.innerWidth; sh=window.innerHeight;
-    grip.setPointerCapture(e.pointerId);
+  const api=()=>window.pywebview&&window.pywebview.api;
+  let drag=null,last=0,pendingId=0;
+
+  [['rz-n','n'],['rz-s','s'],['rz-w','w'],['rz-e','e'],
+   ['rz-nw','nw'],['rz-ne','ne'],['rz-sw','sw'],['rz-se','se']
+  ].forEach(([id,side])=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+
+    el.addEventListener('pointerdown',async e=>{
+      e.stopPropagation(); e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const myId=++pendingId, sx=e.screenX, sy=e.screenY;
+      if(!api()) return;
+      const b=await api().get_bounds();
+      if(pendingId===myId) drag={side,sx,sy,bx:b.x,by:b.y,bw:b.w,bh:b.h};
+    });
+
+    el.addEventListener('pointermove',e=>{
+      if(!drag) return;
+      const now=Date.now(); if(now-last<32) return; last=now;
+      const dx=e.screenX-drag.sx, dy=e.screenY-drag.sy;
+      let {bx,by,bw,bh,side:s}=drag;
+      if(s.includes('e')) bw=Math.max(700,bw+dx);
+      if(s.includes('s')) bh=Math.max(500,bh+dy);
+      if(s.includes('w')){const nw=Math.max(700,bw-dx);bx+=bw-nw;bw=nw;}
+      if(s.includes('n')){const nh=Math.max(500,bh-dy);by+=bh-nh;bh=nh;}
+      if(api()) api().set_bounds(Math.round(bx),Math.round(by),Math.round(bw),Math.round(bh));
+    });
+
+    el.addEventListener('pointerup',()=>{pendingId++;drag=null;});
   });
-  grip.addEventListener('pointermove',e=>{
-    if(!dragging) return;
-    const now=Date.now(); if(now-last<32) return; last=now;
-    const w=Math.max(700,Math.round(sw+(e.clientX-sx)));
-    const h=Math.max(500,Math.round(sh+(e.clientY-sy)));
-    if(window.pywebview) window.pywebview.api.resize_to(w,h);
-  });
-  grip.addEventListener('pointerup',()=>{dragging=false;});
 })();
 </script>
 </body>

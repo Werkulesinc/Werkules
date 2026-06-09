@@ -77,8 +77,13 @@ class AppAPI(BrainAPI):
         self._win.destroy()
         threading.Timer(0.4, lambda: os._exit(0)).start()
 
-    def resize_to(self, w: int, h: int):
-        self._win.resize(max(700, int(w)), max(500, int(h)))
+    def get_bounds(self):
+        return {"x": self._win.x, "y": self._win.y, "w": self._win.width, "h": self._win.height}
+
+    def set_bounds(self, x: int, y: int, w: int, h: int):
+        w, h = max(700, int(w)), max(500, int(h))
+        self._win.move(int(x), int(y))
+        self._win.resize(w, h)
 
     def toggle_mic(self):
         headless_ui.muted = not headless_ui.muted
